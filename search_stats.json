@@ -1,0 +1,430 @@
+{
+    "total_searches": 263,
+    "queries": {
+        "here": {
+            "count": 1,
+            "first_searched": "2025-03-30 00:05:37",
+            "last_searched": "2025-03-30 00:05:37",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "\u4e16\u755c": {
+            "count": 2,
+            "first_searched": "2025-03-30 00:06:28",
+            "last_searched": "2025-03-30 00:30:29",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "mundo": {
+            "count": 16,
+            "first_searched": "2025-03-30 00:30:58",
+            "last_searched": "2025-03-30 01:51:41",
+            "results_count": 0,
+            "trending_score": 16,
+            "metadata": []
+        },
+        "kalibotan": {
+            "count": 10,
+            "first_searched": "2025-03-30 01:09:45",
+            "last_searched": "2025-03-30 01:49:16",
+            "results_count": 0,
+            "trending_score": 10,
+            "metadata": []
+        },
+        "bmx": {
+            "count": 1,
+            "first_searched": "2025-03-30 01:56:31",
+            "last_searched": "2025-03-30 01:56:31",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "game": {
+            "count": 1,
+            "first_searched": "2025-03-30 03:56:28",
+            "last_searched": "2025-03-30 03:56:28",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "smart": {
+            "count": 1,
+            "first_searched": "2025-03-30 05:41:12",
+            "last_searched": "2025-03-30 05:41:12",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "soft": {
+            "count": 1,
+            "first_searched": "2025-03-30 20:22:01",
+            "last_searched": "2025-03-30 20:22:01",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "softbank": {
+            "count": 3,
+            "first_searched": "2025-03-30 20:22:22",
+            "last_searched": "2025-03-30 20:37:45",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "tensorflow": {
+            "count": 1,
+            "first_searched": "2025-03-30 20:57:35",
+            "last_searched": "2025-03-30 20:57:35",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "zoo": {
+            "count": 1,
+            "first_searched": "2025-03-30 21:32:54",
+            "last_searched": "2025-03-30 21:32:54",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "love": {
+            "count": 3,
+            "first_searched": "2025-03-30 21:52:34",
+            "last_searched": "2025-04-02 01:33:29",
+            "results_count": 0,
+            "trending_score": 1.3931364381500095,
+            "metadata": []
+        },
+        "google": {
+            "count": 3,
+            "first_searched": "2025-03-30 21:52:45",
+            "last_searched": "2025-03-30 21:54:01",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "mushrooms": {
+            "count": 1,
+            "first_searched": "2025-03-30 21:54:16",
+            "last_searched": "2025-03-30 21:54:16",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "assissins": {
+            "count": 1,
+            "first_searched": "2025-03-30 22:16:22",
+            "last_searched": "2025-03-30 22:16:22",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "assissinscreed": {
+            "count": 2,
+            "first_searched": "2025-03-30 22:16:33",
+            "last_searched": "2025-03-30 22:16:36",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "gamespot": {
+            "count": 1,
+            "first_searched": "2025-03-30 22:18:04",
+            "last_searched": "2025-03-30 22:18:04",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "minecraft": {
+            "count": 7,
+            "first_searched": "2025-03-31 01:34:57",
+            "last_searched": "2025-03-31 14:06:40",
+            "results_count": 0,
+            "trending_score": 7,
+            "metadata": []
+        },
+        "justis": {
+            "count": 1,
+            "first_searched": "2025-03-31 01:40:26",
+            "last_searched": "2025-03-31 01:40:26",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "sports": {
+            "count": 4,
+            "first_searched": "2025-03-31 01:40:47",
+            "last_searched": "2025-04-02 00:01:14",
+            "results_count": 0,
+            "trending_score": 2.071607113956374,
+            "metadata": []
+        },
+        "bitcoin": {
+            "count": 2,
+            "first_searched": "2025-03-31 01:54:14",
+            "last_searched": "2025-03-31 01:55:09",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "pfs": {
+            "count": 1,
+            "first_searched": "2025-03-31 01:55:29",
+            "last_searched": "2025-03-31 01:55:29",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;368258af5352f74784878c304c222291&quot;,&quot;ciphertext&quot;:&quot;a2667d0591445f1076621a045cfa2162&quot;}": {
+            "count": 5,
+            "first_searched": "2025-03-31 01:55:57",
+            "last_searched": "2025-03-31 02:03:02",
+            "results_count": 0,
+            "trending_score": 5,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;8b11529be4927d5769dd637e&quot;,&quot;ciphertext&quot;:&quot;1460b004243f23baaba6a25f94a5077bc43ae112cd&quot;}": {
+            "count": 3,
+            "first_searched": "2025-03-31 02:07:09",
+            "last_searched": "2025-03-31 02:07:48",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;53b98ca67da0db8256657537&quot;,&quot;ciphertext&quot;:&quot;ce4faa548dc448b56d6a4da4a5a15ea21d351bc1e58945c6f22e0e&quot;}": {
+            "count": 3,
+            "first_searched": "2025-03-31 02:08:03",
+            "last_searched": "2025-03-31 02:12:52",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;c89b48a62fc9eb9f3b8a4841&quot;,&quot;ciphertext&quot;:&quot;38be17f5d67b4dbca3592f1c6c7c4369e4d0e707f7&quot;}": {
+            "count": 2,
+            "first_searched": "2025-03-31 02:17:01",
+            "last_searched": "2025-03-31 02:17:16",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;53cee725b8224944cfa5b8123c90b8ed&quot;,&quot;ciphertext&quot;:&quot;4fb49db8c7cea455ad8dbae87b6b3caf&quot;}": {
+            "count": 1,
+            "first_searched": "2025-03-31 02:17:28",
+            "last_searched": "2025-03-31 02:17:28",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;6ecc75da8407fa197ee5ef8cbc049e0d&quot;,&quot;ciphertext&quot;:&quot;09fa4838b285fe29e16d7d2b6727789d&quot;}": {
+            "count": 3,
+            "first_searched": "2025-03-31 02:17:53",
+            "last_searched": "2025-03-31 02:20:14",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;bb44b1b78b3c36c37e703847c6ab313c&quot;,&quot;ciphertext&quot;:&quot;af50db662a58ff04f126bcee852d6b8b&quot;}": {
+            "count": 1,
+            "first_searched": "2025-03-31 02:20:42",
+            "last_searched": "2025-03-31 02:20:42",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "{&quot;iv&quot;:&quot;91408a4056d00e4fbe1a248316f95e30&quot;,&quot;ciphertext&quot;:&quot;3069cb172988cf4308faa06784566331&quot;}": {
+            "count": 3,
+            "first_searched": "2025-03-31 02:28:09",
+            "last_searched": "2025-03-31 02:28:48",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "fold": {
+            "count": 1,
+            "first_searched": "2025-03-31 04:47:16",
+            "last_searched": "2025-03-31 04:47:16",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "gold": {
+            "count": 2,
+            "first_searched": "2025-03-31 04:47:31",
+            "last_searched": "2025-03-31 04:48:13",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "justiscraft": {
+            "count": 3,
+            "first_searched": "2025-03-31 14:06:55",
+            "last_searched": "2025-03-31 14:07:29",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
+        },
+        "youtube": {
+            "count": 1,
+            "first_searched": "2025-03-31 14:07:37",
+            "last_searched": "2025-03-31 14:07:37",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "coffee": {
+            "count": 4,
+            "first_searched": "2025-03-31 14:32:28",
+            "last_searched": "2025-03-31 14:59:50",
+            "results_count": 0,
+            "trending_score": 4,
+            "metadata": []
+        },
+        "birds": {
+            "count": 1,
+            "first_searched": "2025-03-31 23:09:43",
+            "last_searched": "2025-03-31 23:09:43",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "camping": {
+            "count": 1,
+            "first_searched": "2025-03-31 23:10:26",
+            "last_searched": "2025-03-31 23:10:26",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "cats": {
+            "count": 1,
+            "first_searched": "2025-04-01 00:09:45",
+            "last_searched": "2025-04-01 00:09:45",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "dogs": {
+            "count": 6,
+            "first_searched": "2025-04-01 00:10:23",
+            "last_searched": "2025-04-02 01:15:32",
+            "results_count": 0,
+            "trending_score": 5.7402916652825295,
+            "metadata": []
+        },
+        "zebra": {
+            "count": 2,
+            "first_searched": "2025-04-01 00:10:52",
+            "last_searched": "2025-04-01 23:43:01",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "peace and understanding": {
+            "count": 1,
+            "first_searched": "2025-04-01 00:58:19",
+            "last_searched": "2025-04-01 00:58:19",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "peace": {
+            "count": 1,
+            "first_searched": "2025-04-01 00:58:26",
+            "last_searched": "2025-04-01 00:58:26",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "github": {
+            "count": 13,
+            "first_searched": "2025-04-01 02:22:19",
+            "last_searched": "2025-04-02 04:10:47",
+            "results_count": 0,
+            "trending_score": 12.08937874025918,
+            "metadata": []
+        },
+        "sex": {
+            "count": 1,
+            "first_searched": "2025-04-02 01:32:16",
+            "last_searched": "2025-04-02 01:32:16",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        },
+        "0.0.0.0": {
+            "count": 2,
+            "first_searched": "2025-04-02 01:36:25",
+            "last_searched": "2025-04-02 01:36:43",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "fall": {
+            "count": 7,
+            "first_searched": "2025-04-02 16:03:51",
+            "last_searched": "2025-04-02 19:41:16",
+            "results_count": 0,
+            "trending_score": 7,
+            "metadata": []
+        },
+        "hello": {
+            "count": 18,
+            "first_searched": "2025-04-03 03:59:11",
+            "last_searched": "2025-04-03 06:01:12",
+            "results_count": 0,
+            "trending_score": 18,
+            "metadata": []
+        },
+        "hi": {
+            "count": 6,
+            "first_searched": "2025-04-03 04:40:01",
+            "last_searched": "2025-04-03 04:49:18",
+            "results_count": 0,
+            "trending_score": 6,
+            "metadata": []
+        },
+        "world": {
+            "count": 22,
+            "first_searched": "2025-04-03 06:09:03",
+            "last_searched": "2025-04-03 07:17:44",
+            "results_count": 0,
+            "trending_score": 22,
+            "metadata": []
+        },
+        "hype": {
+            "count": 36,
+            "first_searched": "2025-04-03 07:26:27",
+            "last_searched": "2025-04-03 09:10:03",
+            "results_count": 0,
+            "trending_score": 36,
+            "metadata": []
+        },
+        "lord of the rings": {
+            "count": 46,
+            "first_searched": "2025-04-03 09:10:47",
+            "last_searched": "2025-04-03 10:39:44",
+            "results_count": 0,
+            "trending_score": 46,
+            "metadata": []
+        },
+        "cigs": {
+            "count": 2,
+            "first_searched": "2025-04-03 10:43:19",
+            "last_searched": "2025-04-03 10:44:13",
+            "results_count": 0,
+            "trending_score": 2,
+            "metadata": []
+        },
+        "https:\/\/github.com": {
+            "count": 1,
+            "first_searched": "2025-04-03 10:43:52",
+            "last_searched": "2025-04-03 10:43:52",
+            "results_count": 0,
+            "trending_score": 1,
+            "metadata": []
+        }
+    },
+    "last_updated": "2025-04-03 10:44:13"
+}

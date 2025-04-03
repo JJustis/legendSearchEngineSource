@@ -1,0 +1,570 @@
+<?php
+/**
+ * Site Crawler and Indexer
+ * 
+ * This script processes all registered sites in the database and crawls
+ * each site to extract pages and index them in the site_pages table.
+ * 
+ * Usage: php site_crawler.php [options]
+ * 
+ * Options:
+ *   --help                Show this help message
+ *   --batch=N             Process N sites at a time (default: 5)
+ *   --delay=N             Add N milliseconds delay between requests (default: 1000)
+ *   --max-pages=N         Maximum number of pages to crawl per site (default: 50)
+ *   --timeout=N           Timeout in seconds for requests (default: 10)
+ *   --start-id=N          Start from site with ID N (default: process all sites)
+ *   --max-sites=N         Maximum number of sites to process (default: 0 = all)
+ *   --db-host=host        Database hostname (default: localhost)
+ *   --db-user=user        Database username (default: root)
+ *   --db-pass=pass        Database password (default: empty)
+ *   --db-name=name        Database name (default: legenddx)
+ *   --skip-existing       Skip sites that have already been crawled (default: false)
+ *   --quiet               Only output successful crawls
+ *   --verbose             Show detailed progress
+ * 
+ * Examples:
+ *   php site_crawler.php
+ *   php site_crawler.php --batch=10 --delay=500 --max-pages=100
+ *   php site_crawler.php --start-id=101 --max-sites=50 --skip-existing
+ */
+
+// Default configuration
+$config = [
+    'batch_size' => 5,
+    'delay' => 10,
+    'max_pages' => 50,
+    'timeout' => 10,
+    'start_id' => 0,
+    'max_sites' => 0,
+    'db_host' => 'localhost',
+    'db_user' => 'root',
+    'db_pass' => '',
+    'db_name' => 'legenddx',
+    'skip_existing' => false,
+    'quiet' => false,
+    'verbose' => false
+];
+
+// Parse command line arguments
+$options = getopt('h', [
+    'help', 'batch:', 'delay:', 'max-pages:', 'timeout:', 'start-id:', 'max-sites:',
+    'db-host:', 'db-user:', 'db-pass:', 'db-name:', 'skip-existing', 'quiet', 'verbose'
+]);
+
+// Show help if requested
+if (isset($options['h']) || isset($options['help'])) {
+    showHelp();
+    exit(0);
+}
+
+// Apply options
+if (isset($options['batch'])) $config['batch_size'] = intval($options['batch']);
+if (isset($options['delay'])) $config['delay'] = intval($options['delay']);
+if (isset($options['max-pages'])) $config['max_pages'] = intval($options['max-pages']);
+if (isset($options['timeout'])) $config['timeout'] = intval($options['timeout']);
+if (isset($options['start-id'])) $config['start_id'] = intval($options['start-id']);
+if (isset($options['max-sites'])) $config['max_sites'] = intval($options['max-sites']);
+if (isset($options['db-host'])) $config['db_host'] = $options['db-host'];
+if (isset($options['db-user'])) $config['db_user'] = $options['db-user'];
+if (isset($options['db-pass'])) $config['db_pass'] = $options['db-pass'];
+if (isset($options['db-name'])) $config['db_name'] = $options['db-name'];
+if (isset($options['skip-existing'])) $config['skip_existing'] = true;
+if (isset($options['quiet'])) $config['quiet'] = true;
+if (isset($options['verbose'])) $config['verbose'] = true;
+
+// Connect to database
+$db = connectToDatabase($config);
+
+// Show configuration if not quiet
+if (!$config['quiet']) {
+    echo "Site Crawler and Indexer\n";
+    echo "----------------------\n";
+    echo "Batch Size: {$config['batch_size']} sites\n";
+    echo "Delay: {$config['delay']}ms\n";
+    echo "Max Pages Per Site: {$config['max_pages']}\n";
+    echo "Timeout: {$config['timeout']} seconds\n";
+    if ($config['start_id'] > 0) echo "Starting from site ID: {$config['start_id']}\n";
+    if ($config['max_sites'] > 0) echo "Maximum Sites: {$config['max_sites']}\n";
+    echo "Skip Existing: " . ($config['skip_existing'] ? "Yes" : "No") . "\n";
+    echo "Database: {$config['db_name']}\n";
+    echo "----------------------\n";
+}
+
+// Start processing
+processSites($config, $db);
+
+// ================ FUNCTIONS ================
+
+/**
+ * Display help message
+ */
+function showHelp() {
+    echo "Site Crawler and Indexer\n\n";
+    echo "This script processes all registered sites in the database and crawls\n";
+    echo "each site to extract pages and index them in the site_pages table.\n\n";
+    echo "Usage: php " . basename(__FILE__) . " [options]\n\n";
+    echo "Options:\n";
+    echo "  --help                Show this help message\n";
+    echo "  --batch=N             Process N sites at a time (default: 5)\n";
+    echo "  --delay=N             Add N milliseconds delay between requests (default: 1000)\n";
+    echo "  --max-pages=N         Maximum number of pages to crawl per site (default: 50)\n";
+    echo "  --timeout=N           Timeout in seconds for requests (default: 10)\n";
+    echo "  --start-id=N          Start from site with ID N (default: process all sites)\n";
+    echo "  --max-sites=N         Maximum number of sites to process (default: 0 = all)\n";
+    echo "  --db-host=host        Database hostname (default: localhost)\n";
+    echo "  --db-user=user        Database username (default: root)\n";
+    echo "  --db-pass=pass        Database password (default: empty)\n";
+    echo "  --db-name=name        Database name (default: legenddx)\n";
+    echo "  --skip-existing       Skip sites that have already been crawled (default: false)\n";
+    echo "  --quiet               Only output successful crawls\n";
+    echo "  --verbose             Show detailed progress\n\n";
+    echo "Examples:\n";
+    echo "  php " . basename(__FILE__) . "\n";
+    echo "  php " . basename(__FILE__) . " --batch=10 --delay=500 --max-pages=100\n";
+    echo "  php " . basename(__FILE__) . " --start-id=101 --max-sites=50 --skip-existing\n";
+}
+
+/**
+ * Connect to the database
+ */
+function connectToDatabase($config) {
+    try {
+        $dsn = "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4";
+        $pdo = new PDO($dsn, $config['db_user'], $config['db_pass']);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        return $pdo;
+    } catch (PDOException $e) {
+        die("Database Connection Error: " . $e->getMessage() . "\n");
+    }
+}
+
+/**
+ * Get all registered sites from database
+ */
+function getSitesToProcess($pdo, $config) {
+    try {
+        $conditions = [];
+        $params = [];
+        
+        // Add start ID condition if specified
+        if ($config['start_id'] > 0) {
+            $conditions[] = "id >= ?";
+            $params[] = $config['start_id'];
+        }
+        
+        // Build query
+        $query = "SELECT id, url, title FROM registered_sites";
+        
+        if (!empty($conditions)) {
+            $query .= " WHERE " . implode(" AND ", $conditions);
+        }
+        
+        // Order by ID and limit if needed
+        $query .= " ORDER BY id ASC";
+        
+        if ($config['max_sites'] > 0) {
+            $query .= " LIMIT " . $config['max_sites'];
+        }
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        die("Error fetching sites: " . $e->getMessage() . "\n");
+    }
+}
+
+/**
+ * Check if a site has been crawled before
+ */
+function siteHasBeenCrawled($pdo, $siteId) {
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM site_pages WHERE site_id = ?");
+        $stmt->execute([$siteId]);
+        
+        return $stmt->fetchColumn() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+/**
+ * Process all sites
+ */
+function processSites($config, $pdo) {
+    // Get all sites to process
+    $sites = getSitesToProcess($pdo, $config);
+    $totalSites = count($sites);
+    
+    if ($totalSites == 0) {
+        die("No sites found to process.\n");
+    }
+    
+    if (!$config['quiet']) {
+        echo "Found $totalSites sites to process\n";
+    }
+    
+    // Initialize counters
+    $processed = 0;
+    $successful = 0;
+    $skipped = 0;
+    $failed = 0;
+    $startTime = time();
+    
+    // Process in batches
+    for ($i = 0; $i < $totalSites; $i += $config['batch_size']) {
+        $batch = array_slice($sites, $i, $config['batch_size']);
+        
+        // Process batch
+        foreach ($batch as $site) {
+            $siteId = $site['id'];
+            $siteUrl = $site['url'];
+            
+            // Check if site should be skipped
+            if ($config['skip_existing'] && siteHasBeenCrawled($pdo, $siteId)) {
+                if (!$config['quiet']) {
+                    echo "Skipping site ID $siteId ($siteUrl) - already crawled\n";
+                }
+                $skipped++;
+                $processed++;
+                continue;
+            }
+            
+            if (!$config['quiet']) {
+                echo "Processing site ID $siteId: $siteUrl\n";
+            }
+            
+            // Crawl the site
+            $result = crawlSite($site, $config, $pdo);
+            $processed++;
+            
+            if ($result['success']) {
+                $successful++;
+                
+                if (!$config['quiet']) {
+                    echo "Successfully crawled {$result['page_count']} pages from $siteUrl\n";
+                    
+                    if ($config['verbose']) {
+                        echo "  Time: {$result['time']} seconds\n";
+                        echo "  New pages: {$result['new_pages']}\n";
+                        echo "  Updated pages: {$result['updated_pages']}\n";
+                    }
+                }
+            } else {
+                $failed++;
+                
+                if (!$config['quiet']) {
+                    echo "Failed to crawl $siteUrl: {$result['error']}\n";
+                }
+            }
+            
+            // Display progress
+            if (!$config['quiet'] && $processed % 5 == 0) {
+                $elapsedSeconds = time() - $startTime;
+                $sitesPerHour = $elapsedSeconds > 0 ? round(($processed / $elapsedSeconds) * 3600, 2) : 0;
+                $progress = round(($processed / $totalSites) * 100, 2);
+                
+                echo "Progress: $progress% | Processed: $processed/$totalSites | Success: $successful | Skipped: $skipped | Failed: $failed | Rate: $sitesPerHour sites/hour\n";
+            }
+            
+            // Add delay between sites
+            if ($config['delay'] > 0) {
+                usleep($config['delay'] * 1000); // Convert to microseconds
+            }
+        }
+    }
+    
+    // Calculate final stats
+    $endTime = time();
+    $duration = $endTime - $startTime;
+    $sitesPerHour = $duration > 0 ? round(($processed / $duration) * 3600, 2) : 0;
+    
+    // Display summary
+    if (!$config['quiet']) {
+        echo "\n========== PROCESSING COMPLETE ==========\n";
+        echo "Sites Processed: $processed/$totalSites\n";
+        echo "Successful: $successful\n";
+        echo "Skipped: $skipped\n";
+        echo "Failed: $failed\n";
+        echo "Duration: " . formatTime($duration) . "\n";
+        echo "Processing Rate: $sitesPerHour sites/hour\n";
+        echo "Success Rate: " . round(($successful / ($processed - $skipped)) * 100, 2) . "%\n";
+        echo "==========================================\n";
+    }
+}
+
+/**
+ * Crawl a website and extract pages
+ */
+function crawlSite($site, $config, $pdo) {
+    $siteId = $site['id'];
+    $siteUrl = $site['url'];
+    $startTime = microtime(true);
+    
+    $result = [
+        'success' => false,
+        'page_count' => 0,
+        'new_pages' => 0,
+        'updated_pages' => 0,
+        'error' => '',
+        'time' => 0
+    ];
+    
+    try {
+        // Normalize URL
+        if (!preg_match("~^(?:f|ht)tps?://~i", $siteUrl)) {
+            $siteUrl = "http://" . $siteUrl;
+        }
+        
+        // Parse URL
+        $parsedUrl = parse_url($siteUrl);
+        if (!$parsedUrl || !isset($parsedUrl['host'])) {
+            throw new Exception("Invalid URL: $siteUrl");
+        }
+        
+        $baseUrl = (isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] : 'http') . '://' . $parsedUrl['host'];
+        $baseUrlPattern = '/^' . preg_quote($baseUrl, '/') . '/';
+        
+        // Already crawled URLs
+        $crawledUrls = [];
+        
+        // URLs to crawl
+        $urlsToCrawl = [$siteUrl];
+        
+        // Pages found
+        $pagesFound = [];
+        
+        // Begin crawling
+        while (count($urlsToCrawl) > 0 && count($pagesFound) < $config['max_pages']) {
+            $currentUrl = array_shift($urlsToCrawl);
+            
+            // Skip if already crawled
+            if (isset($crawledUrls[$currentUrl])) {
+                continue;
+            }
+            
+            // Mark as crawled
+            $crawledUrls[$currentUrl] = true;
+            
+            // Fetch page
+            $pageInfo = fetchPage($currentUrl, $config['timeout']);
+            
+            if (!$pageInfo['success']) {
+                if ($config['verbose']) {
+                    echo "  Failed to fetch $currentUrl: {$pageInfo['error']}\n";
+                }
+                continue;
+            }
+            
+            // Store page info
+            $pagesFound[] = [
+                'url' => $currentUrl,
+                'title' => $pageInfo['title'],
+                'content' => $pageInfo['content']
+            ];
+            
+            // Extract links
+            $links = extractLinks($pageInfo['content'], $currentUrl, $baseUrl);
+            
+            // Filter links to only include those from the same domain
+            foreach ($links as $link) {
+                if (count($urlsToCrawl) + count($crawledUrls) >= $config['max_pages']) {
+                    break;
+                }
+                
+                if (!isset($crawledUrls[$link]) && !in_array($link, $urlsToCrawl)) {
+                    // Only add links from the same domain
+                    if (preg_match($baseUrlPattern, $link)) {
+                        $urlsToCrawl[] = $link;
+                    }
+                }
+            }
+            
+            // Add delay between requests
+            usleep(($config['delay'] / 5) * 1000); // Use a shorter delay for individual pages
+        }
+        
+        // Save pages to database
+        $newPages = 0;
+        $updatedPages = 0;
+        
+        foreach ($pagesFound as $page) {
+            $contentHash = md5($page['content']);
+            $saved = savePage($pdo, $siteId, $page['url'], $page['title'], $contentHash);
+            
+            if ($saved === 'new') {
+                $newPages++;
+            } elseif ($saved === 'updated') {
+                $updatedPages++;
+            }
+        }
+        
+        // Update success info
+        $result['success'] = true;
+        $result['page_count'] = count($pagesFound);
+        $result['new_pages'] = $newPages;
+        $result['updated_pages'] = $updatedPages;
+        
+    } catch (Exception $e) {
+        $result['error'] = $e->getMessage();
+    }
+    
+    // Calculate elapsed time
+    $endTime = microtime(true);
+    $result['time'] = round($endTime - $startTime, 2);
+    
+    return $result;
+}
+
+/**
+ * Fetch a web page
+ */
+function fetchPage($url, $timeout = 10) {
+    $result = [
+        'success' => false,
+        'title' => '',
+        'content' => '',
+        'error' => ''
+    ];
+    
+    // Initialize cURL
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; LegendDX/1.0; +http://legenddx.com/bot)');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    
+    $html = curl_exec($ch);
+    
+    // Check for errors
+    if (curl_errno($ch)) {
+        $result['error'] = curl_error($ch);
+        curl_close($ch);
+        return $result;
+    }
+    
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    // Check if request was successful
+    if ($httpCode < 200 || $httpCode >= 300) {
+        $result['error'] = "HTTP Error: $httpCode";
+        return $result;
+    }
+    
+    // Extract title
+    if (preg_match('/<title[^>]*>(.*?)<\/title>/si', $html, $matches)) {
+        $result['title'] = trim($matches[1]);
+    } else {
+        $result['title'] = basename($url);
+    }
+    
+    $result['content'] = $html;
+    $result['success'] = true;
+    
+    return $result;
+}
+
+/**
+ * Extract links from HTML content
+ */
+function extractLinks($html, $currentUrl, $baseUrl) {
+    $links = [];
+    
+    // Extract href attributes
+    if (preg_match_all('/<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>/i', $html, $matches)) {
+        foreach ($matches[1] as $link) {
+            // Skip anchors, javascript, and mailto links
+            if (strpos($link, '#') === 0 || strpos($link, 'javascript:') === 0 || strpos($link, 'mailto:') === 0) {
+                continue;
+            }
+            
+            // Convert relative URLs to absolute
+            if (strpos($link, 'http') !== 0) {
+                if (strpos($link, '/') === 0) {
+                    $link = $baseUrl . $link;
+                } else {
+                    $link = dirname($currentUrl) . '/' . $link;
+                }
+            }
+            
+            // Remove fragments
+            $link = preg_replace('/#.*$/', '', $link);
+            
+            // Add to links array if not empty
+            if (!empty($link)) {
+                $links[] = $link;
+            }
+        }
+    }
+    
+    return $links;
+}
+
+/**
+ * Save page to database
+ */
+function savePage($pdo, $siteId, $url, $title, $contentHash) {
+    try {
+        // Check if page already exists
+        $stmt = $pdo->prepare("SELECT id, content_hash FROM site_pages WHERE site_id = ? AND url = ?");
+        $stmt->execute([$siteId, $url]);
+        $existingPage = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $now = date('Y-m-d H:i:s');
+        
+        if ($existingPage) {
+            // Check if content has changed
+            if ($existingPage['content_hash'] !== $contentHash) {
+                // Update page
+                $stmt = $pdo->prepare("
+                    UPDATE site_pages SET 
+                        title = ?,
+                        content_hash = ?,
+                        last_crawl = ?
+                    WHERE id = ?
+                ");
+                
+                $stmt->execute([$title, $contentHash, $now, $existingPage['id']]);
+                return 'updated';
+            } else {
+                // Just update the crawl time
+                $stmt = $pdo->prepare("UPDATE site_pages SET last_crawl = ? WHERE id = ?");
+                $stmt->execute([$now, $existingPage['id']]);
+                return 'unchanged';
+            }
+        } else {
+            // Insert new page
+            $stmt = $pdo->prepare("
+                INSERT INTO site_pages 
+                (site_id, url, title, content_hash, last_crawl) 
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([$siteId, $url, $title, $contentHash, $now]);
+            return 'new';
+        }
+    } catch (PDOException $e) {
+        return 'error: ' . $e->getMessage();
+    }
+}
+
+/**
+ * Format time in human-readable format
+ */
+function formatTime($seconds) {
+    $hours = floor($seconds / 3600);
+    $minutes = floor(($seconds % 3600) / 60);
+    $seconds = $seconds % 60;
+    
+    return sprintf("%02d:%02d:%02d", $hours, $minutes, $seconds);
+}
+?>

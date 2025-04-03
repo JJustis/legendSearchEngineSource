@@ -1,0 +1,439 @@
+{
+    "hostnames": {
+        "example.com": {
+            "appearances": 18,
+            "first_appeared": "2025-03-27 05:23:51",
+            "last_appeared": "2025-03-27 07:25:31",
+            "queries": [
+                "village",
+                "minecraft",
+                "jcmc.serveminecraft.net",
+                "https:\/\/jcmc.serveminecraft.net",
+                "www.break.com"
+            ],
+            "trending_score": 18,
+            "metadata": []
+        },
+        "wikipedia.org": {
+            "appearances": 18,
+            "first_appeared": "2025-03-27 05:23:51",
+            "last_appeared": "2025-03-27 07:25:31",
+            "queries": [
+                "village",
+                "minecraft",
+                "jcmc.serveminecraft.net",
+                "https:\/\/jcmc.serveminecraft.net",
+                "www.break.com"
+            ],
+            "trending_score": 18,
+            "metadata": []
+        },
+        "learn.example.org": {
+            "appearances": 18,
+            "first_appeared": "2025-03-27 05:23:51",
+            "last_appeared": "2025-03-27 07:25:31",
+            "queries": [
+                "village",
+                "minecraft",
+                "jcmc.serveminecraft.net",
+                "https:\/\/jcmc.serveminecraft.net",
+                "www.break.com"
+            ],
+            "trending_score": 18,
+            "metadata": []
+        },
+        "en.wikipedia.org": {
+            "appearances": 1824,
+            "first_appeared": "2025-03-27 06:56:22",
+            "last_appeared": "2025-04-03 10:44:13",
+            "queries": [
+                "here",
+                "Jet",
+                "apples",
+                "happy",
+                "hello",
+                "ip",
+                "images",
+                "minecraft",
+                "physics",
+                "google",
+                "pyrites",
+                "chocolate",
+                "gold",
+                "Here",
+                "youtube",
+                "Hello",
+                "her",
+                "Harrods",
+                "yahoo",
+                "yahoo!",
+                "famous",
+                "bing",
+                "live",
+                "wikipedia",
+                "color",
+                "x",
+                "twitter",
+                "scribd",
+                "justiscraft",
+                "jcmc",
+                "gaming",
+                "amazon",
+                "wiki",
+                "games",
+                "fandom",
+                "font#",
+                "font",
+                "font#mine",
+                "Minecraft",
+                "junit 5",
+                "freedom",
+                "love",
+                "test",
+                "test.mp4",
+                "dinner",
+                "soda",
+                "new",
+                "LegendDX",
+                "legend",
+                "hekllo",
+                "hi",
+                "boom",
+                "shhhom",
+                "thought",
+                "land",
+                "pfs",
+                "college",
+                "Tech",
+                "something else",
+                "craigslist",
+                "craigslit",
+                "\u3053\u3093\u306b\u3061\u306f",
+                "Mundo",
+                "Kalibotan",
+                "bmx",
+                "game",
+                "smart",
+                "soft",
+                "softbank",
+                "tensorflow",
+                "zoo",
+                "mushrooms",
+                "assissins",
+                "assissinscreed",
+                "gamespot",
+                "Justis",
+                "Sports",
+                "Bitcoin",
+                "PFS",
+                "Fold",
+                "Gold",
+                "coffee",
+                "Birds",
+                "Camping",
+                "cats",
+                "dogs",
+                "zebra",
+                "Peace",
+                "github",
+                "sports",
+                "sex",
+                "0.0.0.0",
+                "fall",
+                "world",
+                "hype",
+                "Cigs"
+            ],
+            "trending_score": 256.30351732314585,
+            "metadata": []
+        },
+        "desktop-988msut": {
+            "appearances": 1,
+            "first_appeared": "2025-03-28 02:03:06",
+            "last_appeared": "2025-03-28 02:03:06",
+            "queries": [
+                "ip-lookup"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "default-rdns.vocus.co.nz": {
+            "appearances": 1,
+            "first_appeared": "2025-03-28 02:09:00",
+            "last_appeared": "2025-03-28 02:09:00",
+            "queries": [
+                "ip-lookup"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "crypto.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "creativebloq.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "artists.youtube.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "wattpad.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "market.android.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "9gag.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "join.slack.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "cnabrasil.org.br": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "bible.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "festivaldesantipodes.com": {
+            "appearances": 1,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:45:34",
+            "queries": [
+                "here"
+            ],
+            "trending_score": 1,
+            "metadata": []
+        },
+        "jcmc.serveminecraft.net": {
+            "appearances": 6,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "here",
+                "error",
+                "search"
+            ],
+            "trending_score": 6,
+            "metadata": []
+        },
+        "www.bing.com": {
+            "appearances": 6,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "here",
+                "error",
+                "search"
+            ],
+            "trending_score": 6,
+            "metadata": []
+        },
+        "www.youtube.com": {
+            "appearances": 6,
+            "first_appeared": "2025-03-29 04:45:34",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "here",
+                "error",
+                "search"
+            ],
+            "trending_score": 6,
+            "metadata": []
+        },
+        "helloqueen.pl": {
+            "appearances": 2,
+            "first_appeared": "2025-03-29 04:47:17",
+            "last_appeared": "2025-03-29 05:04:37",
+            "queries": [
+                "hello"
+            ],
+            "trending_score": 2,
+            "metadata": []
+        },
+        "cve.mitre.org": {
+            "appearances": 2,
+            "first_appeared": "2025-03-29 04:51:44",
+            "last_appeared": "2025-03-29 04:52:03",
+            "queries": [
+                "error"
+            ],
+            "trending_score": 2,
+            "metadata": []
+        },
+        "www.google.com": {
+            "appearances": 2,
+            "first_appeared": "2025-03-29 04:51:44",
+            "last_appeared": "2025-03-29 04:52:03",
+            "queries": [
+                "error"
+            ],
+            "trending_score": 2,
+            "metadata": []
+        },
+        "thinkwithgoogle.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "wiley.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "mapbox.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "bahairesearch.org": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "udr.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "scoop.it": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "usenix.org": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "letsencrypt.org": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "yoast.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        },
+        "marketingland.com": {
+            "appearances": 3,
+            "first_appeared": "2025-03-29 04:54:55",
+            "last_appeared": "2025-03-29 04:55:59",
+            "queries": [
+                "search"
+            ],
+            "trending_score": 3,
+            "metadata": []
+        }
+    },
+    "total_appearances": 1944,
+    "last_updated": "2025-04-03 10:44:13"
+}

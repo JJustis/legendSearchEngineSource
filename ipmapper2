@@ -1,0 +1,1406 @@
+<?php
+// ip_mapper_mysql.php - IP mapping tool with MySQL database storage (Hostname-only version)
+session_start();
+
+// Database Configuration
+$db_config = [
+    'host' => 'localhost',
+    'username' => 'root',
+    'password' => '',
+    'database' => 'ip_mapper'
+];
+
+// Configuration
+$max_execution_time = 300; // 5 minutes
+$ips_per_batch = 50; // Number of IPs to process per batch
+
+// Set maximum execution time
+ini_set('max_execution_time', $max_execution_time);
+
+// Initialize variables
+$error = '';
+$message = '';
+$job_status = null;
+$current_range = null;
+
+// Connect to database
+try {
+    $pdo = new PDO(
+        "mysql:host={$db_config['host']};charset=utf8mb4",
+        $db_config['username'],
+        $db_config['password'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+    
+    // Check if database exists
+    $stmt = $pdo->query("SHOW DATABASES LIKE '{$db_config['database']}'");
+    if (!$stmt->fetchColumn()) {
+        // Create database if it doesn't exist
+        $pdo->exec("CREATE DATABASE `{$db_config['database']}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $message = "Database created successfully!";
+    }
+    
+    // Connect to database
+    $pdo->exec("USE `{$db_config['database']}`");
+    
+    // Create tables if they don't exist
+    // Hostnames Table (only records found hostnames)
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `hostnames` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `ip_address` VARCHAR(39) NOT NULL,
+            `hostname` VARCHAR(255) NOT NULL,
+            `first_seen` DATETIME NOT NULL,
+            `last_seen` DATETIME NOT NULL,
+            `visit_count` INT UNSIGNED NOT NULL DEFAULT 1,
+            `lookup_time_ms` INT UNSIGNED NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE INDEX `idx_ip_address` (`ip_address`),
+            INDEX `idx_hostname` (`hostname`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    
+    // Website Metadata Table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `website_metadata` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `hostname_id` BIGINT UNSIGNED NOT NULL,
+            `title` VARCHAR(255) NULL DEFAULT NULL,
+            `description` TEXT NULL DEFAULT NULL,
+            `keywords` TEXT NULL DEFAULT NULL,
+            `content_snippet` TEXT NULL DEFAULT NULL,
+            `last_fetched` DATETIME NOT NULL,
+            `http_status` INT NULL DEFAULT NULL,
+            `content_type` VARCHAR(100) NULL DEFAULT NULL,
+            `page_size_bytes` INT UNSIGNED NULL DEFAULT NULL,
+            `website_url` VARCHAR(255) NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            INDEX `idx_hostname_id` (`hostname_id`),
+            CONSTRAINT `fk_website_metadata_hostname_id` FOREIGN KEY (`hostname_id`) 
+                REFERENCES `hostnames` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    
+    // Jobs Table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `jobs` (
+            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `job_id` VARCHAR(36) NOT NULL,
+            `start_ip` VARCHAR(39) NOT NULL,
+            `end_ip` VARCHAR(39) NOT NULL,
+            `current_ip` VARCHAR(39) NOT NULL,
+            `total_ips` BIGINT UNSIGNED NOT NULL,
+            `processed_ips` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `found_hostnames` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            `status` ENUM('running', 'paused', 'completed', 'cancelled') NOT NULL DEFAULT 'running',
+            `start_time` DATETIME NOT NULL,
+            `last_update` DATETIME NOT NULL,
+            `completion_time` DATETIME NULL DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE INDEX `idx_job_id` (`job_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    
+} catch (PDOException $e) {
+    $error = "Database Error: " . $e->getMessage();
+}
+
+// Function to increment IP string
+function incrementIP($ip) {
+    $parts = explode('.', $ip);
+    
+    // Validate IP format
+    if (count($parts) !== 4) {
+        return false;
+    }
+    
+    // Increment last octet
+    $parts[3]++;
+    
+    // Handle overflow (carry)
+    if ($parts[3] > 999) {
+        $parts[3] = 0;
+        $parts[2]++;
+        
+        if ($parts[2] > 999) {
+            $parts[2] = 0;
+            $parts[1]++;
+            
+            if ($parts[1] > 999) {
+                $parts[1] = 0;
+                $parts[0]++;
+                
+                if ($parts[0] > 999) {
+                    // Overflow beyond max IP
+                    return false;
+                }
+            }
+        }
+    }
+    
+    return implode('.', $parts);
+}
+
+// Function to compare IPs
+function compareIPs($ip1, $ip2) {
+    $parts1 = explode('.', $ip1);
+    $parts2 = explode('.', $ip2);
+    
+    for ($i = 0; $i < 4; $i++) {
+        $num1 = intval($parts1[$i]);
+        $num2 = intval($parts2[$i]);
+        
+        if ($num1 < $num2) {
+            return -1;
+        } else if ($num1 > $num2) {
+            return 1;
+        }
+    }
+    
+    return 0; // IPs are equal
+}
+
+// Function to count IPs in range
+function countIPsInRange($start_ip, $end_ip) {
+    $parts1 = explode('.', $start_ip);
+    $parts2 = explode('.', $end_ip);
+    
+    $count = 0;
+    $factor = 1;
+    
+    for ($i = 3; $i >= 0; $i--) {
+        $diff = intval($parts2[$i]) - intval($parts1[$i]);
+        $count += $diff * $factor;
+        $factor *= 1000; // 0-999 range for each octet
+    }
+    
+    // Add 1 to include end IP
+    return $count + 1;
+}
+
+// Function to format number with commas
+function formatNumber($num) {
+    return number_format($num);
+}
+
+// Function to convert to standard IP (for hostname lookup)
+function toStandardIP($ip) {
+    $parts = explode('.', $ip);
+    if (count($parts) !== 4) {
+        return false;
+    }
+    
+    // Ensure each part is in valid range for standard IP
+    foreach ($parts as &$part) {
+        $part = intval($part);
+        if ($part > 255) {
+            $part = 255; // Cap at 255 for standard IP lookup
+        }
+    }
+    
+    return implode('.', $parts);
+}
+
+// Function to check if an IP is a valid standard IP
+function isStandardIP($ip) {
+    $parts = explode('.', $ip);
+    if (count($parts) !== 4) {
+        return false;
+    }
+    
+    foreach ($parts as $part) {
+        if (!is_numeric($part) || $part < 0 || $part > 255) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Function to validate IP format (extended format 0-999)
+function isValidExtendedIP($ip) {
+    $parts = explode('.', $ip);
+    if (count($parts) !== 4) {
+        return false;
+    }
+    
+    foreach ($parts as $part) {
+        if (!is_numeric($part) || $part < 0 || $part > 999) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Function to perform hostname lookup with timeout
+function lookup_hostname($ip, $timeout = 1) {
+    if (!isValidExtendedIP($ip)) {
+        return [
+            'status' => 'error',
+            'ip' => $ip,
+            'message' => 'Invalid IP format',
+            'hostname' => null,
+            'is_valid_ip' => false
+        ];
+    }
+    
+    // Convert to standard IP for lookup if needed
+    $original_ip = $ip;
+    if (!isStandardIP($ip)) {
+        $ip = toStandardIP($ip);
+    }
+    
+    // Set a timeout for gethostbyaddr
+    $old_error_handler = set_error_handler(function() { /* ignore errors */ });
+    $hostname = null;
+    
+    // Use a custom timeout approach
+    $start_time = microtime(true);
+    $hostname = @gethostbyaddr($ip);
+    $end_time = microtime(true);
+    
+    restore_error_handler();
+    
+    // Check if hostname is just the IP (meaning no hostname found)
+    $is_hostname_found = ($hostname && $hostname !== $ip);
+    
+    return [
+        'status' => 'success',
+        'ip' => $original_ip,
+        'standard_ip' => $ip,
+        'hostname' => $hostname,
+        'is_hostname_found' => $is_hostname_found,
+        'is_valid_ip' => true,
+        'lookup_time' => round(($end_time - $start_time) * 1000), // in milliseconds
+        'timestamp' => date('Y-m-d H:i:s')
+    ];
+}
+
+// Function to fetch website metadata
+function fetchWebsiteMetadata($ip, $hostname) {
+    $standard_ip = isStandardIP($ip) ? $ip : toStandardIP($ip);
+    $url = "http://$hostname";  // Use hostname instead of IP for better results
+    $metadata = [
+        'title' => null,
+        'description' => null,
+        'keywords' => null,
+        'content_snippet' => null,
+        'http_status' => null,
+        'content_type' => null,
+        'page_size_bytes' => 0,
+        'website_url' => $url
+    ];
+    
+    // Initialize cURL session
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5); // 5 second timeout
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
+    $html = curl_exec($ch);
+    
+    // Get response info
+    $metadata['http_status'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $metadata['content_type'] = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    $metadata['page_size_bytes'] = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
+    
+    // If there's a redirect, get the final URL
+    $final_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+    if ($final_url !== $url) {
+        $metadata['website_url'] = $final_url;
+    }
+    
+    curl_close($ch);
+    
+    // Parse HTML content if successful
+    if ($metadata['http_status'] >= 200 && $metadata['http_status'] < 300 && $html) {
+        // Extract title
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/si', $html, $matches)) {
+            $metadata['title'] = trim($matches[1]);
+        }
+        
+        // Extract meta description
+        if (preg_match('/<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\'][^>]*>/si', $html, $matches) ||
+            preg_match('/<meta[^>]*content=["\']([^"\']*)["\'][^>]*name=["\']description["\'][^>]*>/si', $html, $matches)) {
+            $metadata['description'] = trim($matches[1]);
+        }
+        
+        // Extract meta keywords
+        if (preg_match('/<meta[^>]*name=["\']keywords["\'][^>]*content=["\']([^"\']*)["\'][^>]*>/si', $html, $matches) ||
+            preg_match('/<meta[^>]*content=["\']([^"\']*)["\'][^>]*name=["\']keywords["\'][^>]*>/si', $html, $matches)) {
+            $metadata['keywords'] = trim($matches[1]);
+        }
+        
+        // Extract content snippet
+        // Strip tags and get first 500 characters of content
+        $body_content = '';
+        if (preg_match('/<body[^>]*>(.*?)<\/body>/si', $html, $matches)) {
+            $body_content = $matches[1];
+        }
+        
+        $text_content = strip_tags($body_content);
+        $text_content = preg_replace('/\s+/', ' ', $text_content); // Normalize whitespace
+        $metadata['content_snippet'] = trim(substr($text_content, 0, 500));
+    }
+    
+    return $metadata;
+}
+
+// Function to get job status from database
+function getJobFromDB($pdo, $job_id) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM jobs WHERE job_id = ?");
+        $stmt->execute([$job_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+// Function to update job status in database
+function updateJobInDB($pdo, $job) {
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE jobs SET 
+                current_ip = ?,
+                processed_ips = ?,
+                found_hostnames = ?,
+                status = ?,
+                last_update = ?,
+                completion_time = ?
+            WHERE job_id = ?
+        ");
+        
+        $stmt->execute([
+            $job['current_ip'],
+            $job['processed_ips'],
+            $job['found_hostnames'],
+            $job['status'],
+            date('Y-m-d H:i:s'),
+            $job['completion_time'] ? date('Y-m-d H:i:s', $job['completion_time']) : null,
+            $job['job_id']
+        ]);
+        
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+// Load current job if one exists
+if (isset($pdo)) {
+    try {
+        // Check if the jobs table exists before trying to query it
+        $stmt = $pdo->query("SHOW TABLES LIKE 'jobs'");
+        if ($stmt->rowCount() > 0) {
+            $stmt = $pdo->prepare("SELECT * FROM jobs WHERE status IN ('running', 'paused') ORDER BY last_update DESC LIMIT 1");
+            $stmt->execute();
+            $job_status = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $e) {
+        $error = "Error loading job: " . $e->getMessage();
+    }
+}
+
+// Start a new job
+if (isset($_POST['start_job']) && !empty($_POST['start_ip']) && !empty($_POST['end_ip'])) {
+    $start_ip = trim($_POST['start_ip']);
+    $end_ip = trim($_POST['end_ip']);
+    
+    // Validate IPs
+    if (!isValidExtendedIP($start_ip)) {
+        $error = "Invalid Start IP format. Please use format like 192.168.1.1 with values from 0-999";
+    } elseif (!isValidExtendedIP($end_ip)) {
+        $error = "Invalid End IP format. Please use format like 192.168.1.1 with values from 0-999";
+    } elseif (compareIPs($start_ip, $end_ip) > 0) {
+        $error = "Start IP must be less than or equal to End IP";
+    } else {
+        // Calculate total IPs in range
+        $total_ips = countIPsInRange($start_ip, $end_ip);
+        
+        // Check if range is too large
+        $max_range = 10000000; // 10 million
+        if ($total_ips > $max_range) {
+            $error = "IP range too large. Please limit to $max_range IPs per job.";
+        } else {
+            // Create a new job
+            try {
+                $job_id = uniqid('job_', true);
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO jobs 
+                    (job_id, start_ip, end_ip, current_ip, total_ips, start_time, last_update) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                
+                $now = date('Y-m-d H:i:s');
+                $stmt->execute([
+                    $job_id,
+                    $start_ip,
+                    $end_ip,
+                    $start_ip,
+                    $total_ips,
+                    $now,
+                    $now
+                ]);
+                
+                $job_status = [
+                    'id' => $pdo->lastInsertId(),
+                    'job_id' => $job_id,
+                    'start_ip' => $start_ip,
+                    'end_ip' => $end_ip,
+                    'current_ip' => $start_ip,
+                    'total_ips' => $total_ips,
+                    'processed_ips' => 0,
+                    'found_hostnames' => 0,
+                    'status' => 'running',
+                    'start_time' => $now,
+                    'last_update' => $now,
+                    'completion_time' => null
+                ];
+                
+                $message = "Started mapping job from $start_ip to $end_ip (total: " . formatNumber($total_ips) . " IPs)";
+            } catch (PDOException $e) {
+                $error = "Error creating job: " . $e->getMessage();
+            }
+        }
+    }
+}
+
+// Resume a job
+if (isset($_POST['resume_job']) && isset($job_status) && $job_status['status'] === 'paused') {
+    try {
+        $stmt = $pdo->prepare("UPDATE jobs SET status = 'running', last_update = ? WHERE job_id = ?");
+        $stmt->execute([date('Y-m-d H:i:s'), $job_status['job_id']]);
+        
+        $job_status['status'] = 'running';
+        $job_status['last_update'] = date('Y-m-d H:i:s');
+        
+        $message = "Resumed mapping job from {$job_status['start_ip']} to {$job_status['end_ip']}";
+    } catch (PDOException $e) {
+        $error = "Error resuming job: " . $e->getMessage();
+    }
+}
+
+// Pause a job
+if (isset($_POST['pause_job']) && isset($job_status) && $job_status['status'] === 'running') {
+    try {
+        $stmt = $pdo->prepare("UPDATE jobs SET status = 'paused', last_update = ? WHERE job_id = ?");
+        $stmt->execute([date('Y-m-d H:i:s'), $job_status['job_id']]);
+        
+        $job_status['status'] = 'paused';
+        $job_status['last_update'] = date('Y-m-d H:i:s');
+        
+        $message = "Paused mapping job";
+    } catch (PDOException $e) {
+        $error = "Error pausing job: " . $e->getMessage();
+    }
+}
+
+// Cancel a job
+if (isset($_POST['cancel_job']) && isset($job_status)) {
+    try {
+        $stmt = $pdo->prepare("UPDATE jobs SET status = 'cancelled', last_update = ? WHERE job_id = ?");
+        $stmt->execute([date('Y-m-d H:i:s'), $job_status['job_id']]);
+        
+        $message = "Canceled mapping job";
+        $job_status = null;
+    } catch (PDOException $e) {
+        $error = "Error canceling job: " . $e->getMessage();
+    }
+}
+
+// Process a batch of IPs if a job is running
+if (isset($job_status) && $job_status['status'] === 'running') {
+    $batch_results = [];
+    $batch_size = $ips_per_batch;
+    $current_ip = $job_status['current_ip'];
+    $end_ip = $job_status['end_ip'];
+    $found_hostnames = $job_status['found_hostnames'];
+    
+    // Process a batch of IPs
+    $batch_count = 0;
+    
+    while ($batch_count < $batch_size && compareIPs($current_ip, $end_ip) <= 0) {
+        // Lookup hostname
+        $result = lookup_hostname($current_ip);
+        
+        if ($result['status'] === 'success') {
+            $batch_results[] = $result;
+            
+            // Only store IPs with successful hostname resolution
+            if ($result['is_hostname_found']) {
+                try {
+                    // Check if hostname already exists in database
+                    $stmt = $pdo->prepare("SELECT id FROM hostnames WHERE ip_address = ?");
+                    $stmt->execute([$result['ip']]);
+                    $existing_hostname = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($existing_hostname) {
+                        // Update existing record
+                        $stmt = $pdo->prepare("
+                            UPDATE hostnames SET 
+                                hostname = ?,
+                                last_seen = ?,
+                                visit_count = visit_count + 1,
+                                lookup_time_ms = ?
+                            WHERE id = ?
+                        ");
+                        
+                        $stmt->execute([
+                            $result['hostname'],
+                            $result['timestamp'],
+                            $result['lookup_time'],
+                            $existing_hostname['id']
+                        ]);
+                        
+                        $hostname_id = $existing_hostname['id'];
+                    } else {
+                        // Insert new record
+                        $stmt = $pdo->prepare("
+                            INSERT INTO hostnames 
+                            (ip_address, hostname, first_seen, last_seen, lookup_time_ms) 
+                            VALUES (?, ?, ?, ?, ?)
+                        ");
+                        
+                        $stmt->execute([
+                            $result['ip'],
+                            $result['hostname'],
+                            $result['timestamp'],
+                            $result['timestamp'],
+                            $result['lookup_time']
+                        ]);
+                        
+                        $hostname_id = $pdo->lastInsertId();
+                        $found_hostnames++; // Increment counter only for new hostnames
+                    }
+                    
+                    // Try to fetch website metadata
+                    $metadata = fetchWebsiteMetadata($result['ip'], $result['hostname']);
+                    
+                    // Save metadata if we got any useful information
+                    if ($metadata['http_status'] || $metadata['title']) {
+                        $stmt = $pdo->prepare("
+                            INSERT INTO website_metadata 
+                            (hostname_id, title, description, keywords, content_snippet, last_fetched, 
+                             http_status, content_type, page_size_bytes, website_url) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ");
+                        
+                        $stmt->execute([
+                            $hostname_id,
+                            $metadata['title'],
+                            $metadata['description'],
+                            $metadata['keywords'],
+                            $metadata['content_snippet'],
+                            date('Y-m-d H:i:s'),
+                            $metadata['http_status'],
+                            $metadata['content_type'],
+                            $metadata['page_size_bytes'],
+                            $metadata['website_url']
+                        ]);
+                    }
+                } catch (PDOException $e) {
+                    // Log error but continue processing
+                    error_log("Database error processing IP {$result['ip']}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        // Increment current IP
+        $current_ip = incrementIP($current_ip);
+        if (!$current_ip) {
+            break; // IP overflow
+        }
+        
+        $batch_count++;
+    }
+    
+    // Update job status
+    try {
+        $job_status['current_ip'] = $current_ip;
+        $job_status['processed_ips'] += $batch_count;
+        $job_status['found_hostnames'] = $found_hostnames;
+        $job_status['last_update'] = date('Y-m-d H:i:s');
+        
+        // Check if job is complete
+        if (!$current_ip || compareIPs($current_ip, $end_ip) > 0) {
+            $job_status['status'] = 'completed';
+            $job_status['completion_time'] = time();
+            $message = "Mapping job completed! Processed " . formatNumber($job_status['processed_ips']) . " IPs and found " . formatNumber($found_hostnames) . " hostnames.";
+        }
+        
+        // Save job status to database
+        updateJobInDB($pdo, $job_status);
+        
+        // Prepare current range for display
+        if ($job_status['status'] === 'running') {
+            $progress_percentage = 0;
+            if ($job_status['total_ips'] > 0) {
+                $progress_percentage = round(($job_status['processed_ips'] / $job_status['total_ips']) * 100, 2);
+            }
+            
+            $current_range = [
+                'current_ip' => $job_status['current_ip'],
+                'progress' => $progress_percentage,
+                'found_hostnames' => $job_status['found_hostnames'],
+                'processed_ips' => $job_status['processed_ips'],
+                'total_ips' => $job_status['total_ips'],
+                'elapsed_time' => strtotime($job_status['last_update']) - strtotime($job_status['start_time'])
+            ];
+        }
+    } catch (PDOException $e) {
+        $error = "Error updating job status: " . $e->getMessage();
+    }
+}
+
+// Get list of completed jobs
+$completed_jobs = [];
+try {
+    // Check if the jobs table exists before trying to query it
+    $stmt = $pdo->query("SHOW TABLES LIKE 'jobs'");
+    if ($stmt->rowCount() > 0) {
+        $stmt = $pdo->prepare("
+            SELECT * FROM jobs 
+            WHERE status IN ('completed', 'cancelled') 
+            ORDER BY last_update DESC 
+            LIMIT 10
+        ");
+        $stmt->execute();
+        $completed_jobs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (PDOException $e) {
+    $error = "Error loading completed jobs: " . $e->getMessage();
+}
+
+// Get statistics
+try {
+    $stats = [
+        'total_hostnames' => 0,
+        'websites_with_metadata' => 0
+    ];
+    $recent_lookups = [];
+    
+    // Check if tables exist before querying them
+    $stmt = $pdo->query("SHOW TABLES LIKE 'hostnames'");
+    if ($stmt->rowCount() > 0) {
+        // Total hostnames
+        $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM hostnames");
+        $stmt->execute();
+        $stats['total_hostnames'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Recent lookups
+        $stmt = $pdo->query("SHOW TABLES LIKE 'website_metadata'");
+        if ($stmt->rowCount() > 0) {
+            // Websites with metadata
+            $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM website_metadata");
+            $stmt->execute();
+            $stats['websites_with_metadata'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Recent lookups with metadata
+            $stmt = $pdo->prepare("
+                SELECT h.*, m.title, m.website_url 
+                FROM hostnames h 
+                LEFT JOIN website_metadata m ON h.id = m.hostname_id 
+                ORDER BY h.last_seen DESC 
+                LIMIT 10
+            ");
+            $stmt->execute();
+            $recent_lookups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            // Recent lookups without metadata
+            $stmt = $pdo->prepare("
+                SELECT * FROM hostnames 
+                ORDER BY last_seen DESC 
+                LIMIT 10
+            ");
+            $stmt->execute();
+            $recent_lookups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+} catch (PDOException $e) {
+    $error = "Error loading statistics: " . $e->getMessage();
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP-Hostname Mapper with Database Storage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;}
+        h2 {
+            font-size: 18px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        .input-group input {
+            flex: 1;
+        }
+        .submit-btn, .action-btn {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .submit-btn:hover, .action-btn:hover {
+            background-color: #3367D6;
+        }
+        .btn-green {
+            background-color: #34A853;
+        }
+        .btn-green:hover {
+            background-color: #2E8B57;
+        }
+        .btn-yellow {
+            background-color: #FBBC05;
+            color: #333;
+        }
+        .btn-yellow:hover {
+            background-color: #F9A825;
+        }
+        .btn-red {
+            background-color: #EA4335;
+        }
+        .btn-red:hover {
+            background-color: #C62828;
+        }
+        .message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .progress-container {
+            margin-top: 20px;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4285F4;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #4285F4;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        thead {
+            background-color: #f0f0f0;
+        }
+        th, td {
+            padding: 12px 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .table-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+        .auto-refresh {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .job-info {
+            margin-bottom: 20px;
+        }
+        .job-info div {
+            margin-bottom: 5px;
+        }
+        .job-info strong {
+            display: inline-block;
+            width: 120px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .metadata {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #4285F4;
+        }
+        .metadata-item {
+            margin-bottom: 5px;
+        }
+        .metadata-label {
+            font-weight: bold;
+            display: inline-block;
+            min-width: 120px;
+        }
+        .search-form {
+            margin-bottom: 20px;
+        }
+        .search-form input {
+            width: 70%;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        .db-status {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IP-Hostname Mapper with Database Storage</h1>
+        
+        <?php if ($message): ?>
+            <div class="message"><?= htmlspecialchars($message) ?></div>
+        <?php endif; ?>
+        
+        <?php if ($error): ?>
+            <div class="error"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="mapping">IP Mapping</div>
+            <div class="tab" data-tab="search">Search Database</div>
+            <div class="tab" data-tab="stats">Statistics</div>
+        </div>
+        
+        <div class="tab-content active" id="mapping-tab">
+            <?php if (isset($job_status) && in_array($job_status['status'], ['running', 'paused'])): ?>
+                <!-- Current Job Status -->
+                <h2>Current Job Status</h2>
+                
+                <div class="job-info">
+                    <div><strong>Range:</strong> <?= htmlspecialchars($job_status['start_ip']) ?> to <?= htmlspecialchars($job_status['end_ip']) ?></div>
+                    <div><strong>Status:</strong> <?= ucfirst(htmlspecialchars($job_status['status'])) ?></div>
+                    <div><strong>Started:</strong> <?= $job_status['start_time'] ?></div>
+                    <div><strong>Last Update:</strong> <?= $job_status['last_update'] ?></div>
+                </div>
+                
+                <?php if ($job_status['status'] === 'running'): ?>
+                    <div class="auto-refresh">
+                        <label>
+                            <input type="checkbox" id="auto-refresh" checked> Auto-refresh (5s)
+                        </label>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (isset($current_range)): ?>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: <?= $current_range['progress'] ?>%;"></div>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-number"><?= formatNumber($current_range['processed_ips']) ?></div>
+                                <div class="stat-label">Processed IPs</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number"><?= formatNumber($current_range['found_hostnames']) ?></div>
+                                <div class="stat-label">Hostnames Found</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number"><?= htmlspecialchars($current_range['progress']) ?>%</div>
+                                <div class="stat-label">Progress</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" id="elapsed-time"><?= gmdate("H:i:s", $current_range['elapsed_time']) ?></div>
+                                <div class="stat-label">Elapsed Time</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <strong>Current IP:</strong> <?= htmlspecialchars($current_range['current_ip']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                
+                <div style="margin-top: 20px;">
+                    <?php if ($job_status['status'] === 'running'): ?>
+                        <form action="" method="POST" style="display: inline-block;">
+                            <input type="hidden" name="pause_job" value="1">
+                            <button type="submit" class="action-btn btn-yellow">Pause Job</button>
+                        </form>
+                    <?php else: ?>
+                        <form action="" method="POST" style="display: inline-block;">
+                            <input type="hidden" name="resume_job" value="1">
+                            <button type="submit" class="action-btn btn-green">Resume Job</button>
+                        </form>
+                    <?php endif; ?>
+                    
+                    <form action="" method="POST" style="display: inline-block;">
+                        <input type="hidden" name="cancel_job" value="1">
+                        <button type="submit" class="action-btn btn-red" onclick="return confirm('Are you sure you want to cancel this job?');">Cancel Job</button>
+                    </form>
+                </div>
+                
+            <?php else: ?>
+                <!-- Start New Job Form -->
+                <h2>Start New IP Range Mapping Job</h2>
+                
+                <form action="" method="POST">
+                    <div class="input-group">
+                        <div class="form-group">
+                            <label for="start_ip">Start IP:</label>
+                            <input type="text" id="start_ip" name="start_ip" placeholder="e.g., 192.168.1.1" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="end_ip">End IP:</label>
+                            <input type="text" id="end_ip" name="end_ip" placeholder="e.g., 192.168.1.255" required>
+                        </div>
+                    </div>
+                    
+                    <p><small>You can use values from 000-999 for each octet. For hostname lookups, values above 255 will be capped at 255.</small></p>
+                    
+                    <button type="submit" name="start_job" value="1" class="submit-btn">Start Mapping Job</button>
+                </form>
+            <?php endif; ?>
+            
+            <!-- Completed Jobs -->
+            <h2>Completed Jobs</h2>
+            
+            <?php if (empty($completed_jobs)): ?>
+                <p>No completed jobs found.</p>
+            <?php else: ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Range</th>
+                            <th>Status</th>
+                            <th>Processed IPs</th>
+                            <th>Found Hostnames</th>
+                            <th>Completion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($completed_jobs as $job): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($job['start_ip']) ?> to <?= htmlspecialchars($job['end_ip']) ?></td>
+                                <td><?= ucfirst(htmlspecialchars($job['status'])) ?></td>
+                                <td><?= formatNumber($job['processed_ips']) ?></td>
+                                <td><?= formatNumber($job['found_hostnames']) ?></td>
+                                <td><?= $job['completion_time'] ? $job['completion_time'] : $job['last_update'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+        
+        <div class="tab-content" id="search-tab">
+            <h2>Search IP Database</h2>
+            
+            <form method="GET" class="search-form">
+                <input type="hidden" name="tab" value="search">
+                <input type="text" name="query" placeholder="Search by IP, hostname, title, or description" value="<?= isset($_GET['query']) ? htmlspecialchars($_GET['query']) : '' ?>">
+                <button type="submit" class="submit-btn">Search</button>
+            </form>
+            
+            <?php
+            // Search database if query provided
+            if (isset($_GET['query']) && !empty($_GET['query'])) {
+                $query = trim($_GET['query']);
+                
+                try {
+                    // Check if tables exist
+                    $tablesExist = true;
+                    $stmt = $pdo->query("SHOW TABLES LIKE 'ip_addresses'");
+                    if ($stmt->rowCount() == 0) {
+                        $tablesExist = false;
+                    }
+                    
+                    $metadataExists = true;
+                    $stmt = $pdo->query("SHOW TABLES LIKE 'website_metadata'");
+                    if ($stmt->rowCount() == 0) {
+                        $metadataExists = false;
+                    }
+                    
+                    if ($tablesExist) {
+                        // Build search query based on available tables
+                        if ($metadataExists) {
+                            // Search in ip_addresses and website_metadata tables
+                            $sql = "
+                                SELECT 
+                                    ip.*, 
+                                    meta.title, 
+                                    meta.description, 
+                                    meta.website_url 
+                                FROM 
+                                    ip_addresses ip 
+                                LEFT JOIN 
+                                    website_metadata meta ON ip.id = meta.ip_id 
+                                WHERE 
+                                    ip.ip_address LIKE ? OR 
+                                    ip.hostname LIKE ? OR 
+                                    meta.title LIKE ? OR 
+                                    meta.description LIKE ? 
+                                ORDER BY 
+                                    ip.last_seen DESC 
+                                LIMIT 100
+                            ";
+                            $params = ["%$query%", "%$query%", "%$query%", "%$query%"];
+                        } else {
+                            // Search only in ip_addresses table
+                            $sql = "
+                                SELECT * FROM ip_addresses
+                                WHERE ip_address LIKE ? OR hostname LIKE ?
+                                ORDER BY last_seen DESC
+                                LIMIT 100
+                            ";
+                            $params = ["%$query%", "%$query%"];
+                        }
+                        
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute($params);
+                        $search_results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        
+                        if (count($search_results) > 0) {
+                            echo "<h3>Search Results (" . count($search_results) . ")</h3>";
+                            
+                            echo "<table>
+                                <thead>
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Hostname</th>";
+                            if ($metadataExists) {
+                                echo "<th>Website Title</th>";
+                            }
+                            echo "<th>Last Seen</th>
+                                        <th>Visits</th>
+                                    </tr>
+                                </thead>
+                                <tbody>";
+                            
+                            foreach ($search_results as $result) {
+                                echo "<tr>
+                                    <td>{$result['ip_address']}</td>
+                                    <td>" . ($result['is_hostname_found'] ? htmlspecialchars($result['hostname']) : "<em>Not found</em>") . "</td>";
+                                if ($metadataExists) {
+                                    echo "<td>" . (isset($result['title']) && $result['title'] ? htmlspecialchars($result['title']) : "<em>No title</em>") . "</td>";
+                                }
+                                echo "<td>{$result['last_seen']}</td>
+                                    <td>{$result['lookup_count']}</td>
+                                </tr>";
+                                
+                                // Show metadata if available
+                                if ($metadataExists && isset($result['title']) && !empty($result['title'])) {
+                                    echo "<tr>
+                                        <td colspan='" . ($metadataExists ? 5 : 4) . "'>
+                                            <div class='metadata'>
+                                                <div class='metadata-item'>
+                                                    <span class='metadata-label'>URL:</span>
+                                                    <a href='" . (isset($result['website_url']) ? htmlspecialchars($result['website_url']) : "http://{$result['ip_address']}") . "' target='_blank'>" . 
+                                                    (isset($result['website_url']) ? htmlspecialchars($result['website_url']) : "http://{$result['ip_address']}") . 
+                                                    "</a>
+                                                </div>";
+                                    if (isset($result['description']) && !empty($result['description'])) {
+                                        echo "<div class='metadata-item'>
+                                                <span class='metadata-label'>Description:</span>
+                                                " . htmlspecialchars($result['description']) . "
+                                              </div>";
+                                    }
+                                    echo "</div>
+                                        </td>
+                                    </tr>";
+                                }
+                            }
+                            
+                            echo "</tbody></table>";
+                        } else {
+                            echo "<p>No results found for: " . htmlspecialchars($query) . "</p>";
+                        }
+                    } else {
+                        echo "<p>No data available yet. Start a mapping job to populate the database.</p>";
+                    }
+                } catch (PDOException $e) {
+                    echo "<div class='error'>Search Error: " . $e->getMessage() . "</div>";
+                }
+            }
+            ?>
+        </div>
+        
+        <div class="tab-content" id="stats-tab">
+            <h2>System Statistics</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-number"><?= formatNumber($stats['total_ips']) ?></div>
+                    <div class="stat-label">Total IPs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number"><?= formatNumber($stats['hostnames_found']) ?></div>
+                    <div class="stat-label">Hostnames Found</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number"><?= formatNumber($stats['websites_with_metadata']) ?></div>
+                    <div class="stat-label">Websites with Metadata</div>
+                </div>
+                <?php if ($stats['total_ips'] > 0): ?>
+                <div class="stat-box">
+                    <div class="stat-number"><?= round(($stats['hostnames_found'] / $stats['total_ips']) * 100, 2) ?>%</div>
+                    <div class="stat-label">Resolution Rate</div>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <h2>Recent Lookups</h2>
+            
+            <?php if (empty($recent_lookups)): ?>
+                <p>No recent lookups found.</p>
+            <?php else: ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Hostname</th>
+                            <?php if (isset($recent_lookups[0]['title'])): ?>
+                            <th>Website</th>
+                            <?php endif; ?>
+                            <th>Last Seen</th>
+                            <th>Visits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recent_lookups as $lookup): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($lookup['ip_address']) ?></td>
+                                <td><?= $lookup['is_hostname_found'] ? htmlspecialchars($lookup['hostname']) : "<em>Not found</em>" ?></td>
+                                <?php if (isset($lookup['title'])): ?>
+                                <td>
+                                    <?php if ($lookup['title']): ?>
+                                        <a href="<?= htmlspecialchars($lookup['website_url']) ?>" target="_blank"><?= htmlspecialchars($lookup['title']) ?></a>
+                                    <?php else: ?>
+                                        <em>No website data</em>
+                                    <?php endif; ?>
+                                </td>
+                                <?php endif; ?>
+                                <td><?= $lookup['last_seen'] ?></td>
+                                <td><?= $lookup['lookup_count'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+            
+            <h2>Database Status</h2>
+            
+            <div class="db-status">
+                <?php
+                // Show database tables and row counts
+                try {
+                    $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+                    
+                    if (empty($tables)) {
+                        echo "No tables found in database.";
+                    } else {
+                        foreach ($tables as $table) {
+                            $count = $pdo->query("SELECT COUNT(*) FROM `$table`")->fetchColumn();
+                            echo "Table: <strong>$table</strong> - $count rows<br>";
+                        }
+                    }
+                } catch (PDOException $e) {
+                    echo "Error fetching database status: " . $e->getMessage();
+                }
+                ?>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                // Show corresponding tab content
+                const tabId = this.getAttribute('data-tab');
+                document.getElementById(tabId + '-tab').classList.add('active');
+                
+                // Update URL parameter
+                const url = new URL(window.location);
+                url.searchParams.set('tab', tabId);
+                window.history.replaceState({}, '', url);
+            });
+        });
+        
+        // Set active tab from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam) {
+            const tabElement = document.querySelector(`.tab[data-tab="${tabParam}"]`);
+            if (tabElement) {
+                tabElement.click();
+            }
+        }
+        
+        <?php if (isset($job_status) && $job_status['status'] === 'running'): ?>
+        // Auto-refresh functionality
+        let autoRefreshCheckbox = document.getElementById('auto-refresh');
+        let autoRefreshInterval;
+        
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(function() {
+                if (autoRefreshCheckbox.checked) {
+                    // Preserve active tab when refreshing
+                    const activeTab = document.querySelector('.tab.active').getAttribute('data-tab');
+                    const url = new URL(window.location);
+                    url.searchParams.set('tab', activeTab);
+                    window.location.href = url.toString();
+                }
+            }, 5000); // Refresh every 5 seconds
+        }
+        
+        // Start auto-refresh on page load
+        startAutoRefresh();
+        
+        // Update elapsed time counter
+        let elapsedTimeElement = document.getElementById('elapsed-time');
+        let elapsedSeconds = <?= isset($current_range) ? $current_range['elapsed_time'] : 0 ?>;
+        
+        function updateElapsedTime() {
+            elapsedSeconds++;
+            let hours = Math.floor(elapsedSeconds / 3600);
+            let minutes = Math.floor((elapsedSeconds % 3600) / 60);
+            let seconds = elapsedSeconds % 60;
+            
+            elapsedTimeElement.textContent = 
+                (hours < 10 ? '0' + hours : hours) + ':' +
+                (minutes < 10 ? '0' + minutes : minutes) + ':' +
+                (seconds < 10 ? '0' + seconds : seconds);
+        }
+        
+        // Update elapsed time every second
+        setInterval(updateElapsedTime, 1000);
+        <?php endif; ?>
+    </script>
+</body>
+</html>

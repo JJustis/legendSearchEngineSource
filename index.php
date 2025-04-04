@@ -51,10 +51,15 @@ if (isset($_GET['term'])) {
         // Get search term and add wildcard
         $term = $_GET['term'] . '%';
         
-        // Query to find matching words
-        $stmt = $pdo->prepare("SELECT word FROM word WHERE word LIKE :term ORDER BY frequency DESC LIMIT 80");
-        $stmt->bindParam(':term', $term, PDO::PARAM_STR);
-        $stmt->execute();
+        $stmt = $pdo->prepare("
+    SELECT rs.id, rs.title, rs.url, rs.description, rs.subject
+    FROM registered_sites rs
+    WHERE MATCH(rs.title, rs.description, rs.keywords) AGAINST (? IN BOOLEAN MODE)
+    ORDER BY rs.registration_date DESC
+    LIMIT ? OFFSET ?
+");
+$searchTerms = $searchQuery . '*'; // Add wildcard for partial matches
+$stmt->execute([$searchTerms, $perPage, $offset]);
         
         // Fetch results
         $results = $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -2939,9 +2944,10 @@ if (isset($_GET['q']) && !empty($_GET['q'])) {
     <?= htmlspecialchars(isset($result['url']) ? $result['url'] : '') ?>
 </div>
                     <h3 class="g-search-result-title">
-                        <a href="<?= htmlspecialchars(isset($result['url']) ? $result['url'] : '#') ?>" <?= strpos($result['url'], 'http') === 0 ? 'target="_blank"' : '' ?>>
-                            <?= htmlspecialchars(isset($result['title']) ? $result['title'] : '') ?>
-                        </a>
+<a href="<?= htmlspecialchars(isset($result['url']) ? (strpos($result['url'], 'http') === 0 ? $result['url'] : 'https://' . $result['url']) : '#') ?>" 
+   target="_blank">
+    <?= htmlspecialchars(isset($result['title']) ? $result['title'] : '') ?>
+</a>
                     </h3>
                     <div class="g-search-result-snippet">
                         <?= htmlspecialchars(isset($result['description']) ? $result['description'] : '') ?>
@@ -4579,6 +4585,41 @@ function updateSearchResultDisplay(resultElement, data) {
     if (snippetElement && data.description) {
         snippetElement.textContent = data.description;
     }
+}
+// Show a progress indicator for better UX
+function showSearchProgress() {
+    const progressBar = document.createElement('div');
+    progressBar.className = 'search-progress-bar';
+    progressBar.innerHTML = `
+        <div class="progress-track">
+            <div class="progress-fill"></div>
+        </div>
+        <div class="progress-text">Searching...</div>
+    `;
+    
+    document.querySelector('.g-search-container').appendChild(progressBar);
+    
+    // Animate progress
+    const fill = progressBar.querySelector('.progress-fill');
+    let width = 0;
+    const interval = setInterval(() => {
+        if (width >= 90) {
+            clearInterval(interval);
+        } else {
+            width += Math.random() * 2;
+            fill.style.width = width + '%';
+        }
+    }, 100);
+    
+    return {
+        complete: () => {
+            fill.style.width = '100%';
+            setTimeout(() => {
+                progressBar.remove();
+            }, 300);
+            clearInterval(interval);
+        }
+    };
 }
 // Function to initialize Wordpedia functionality
 function initWordpedia() {

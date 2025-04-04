@@ -1,5 +1,5 @@
 {
-    "total_searches": 263,
+    "total_searches": 274,
     "queries": {
         "here": {
             "count": 1,
@@ -402,19 +402,19 @@
             "metadata": []
         },
         "lord of the rings": {
-            "count": 46,
+            "count": 49,
             "first_searched": "2025-04-03 09:10:47",
-            "last_searched": "2025-04-03 10:39:44",
+            "last_searched": "2025-04-03 11:02:07",
             "results_count": 0,
-            "trending_score": 46,
+            "trending_score": 49,
             "metadata": []
         },
         "cigs": {
-            "count": 2,
+            "count": 3,
             "first_searched": "2025-04-03 10:43:19",
-            "last_searched": "2025-04-03 10:44:13",
+            "last_searched": "2025-04-03 10:53:56",
             "results_count": 0,
-            "trending_score": 2,
+            "trending_score": 3,
             "metadata": []
         },
         "https:\/\/github.com": {
@@ -424,7 +424,23 @@
             "results_count": 0,
             "trending_score": 1,
             "metadata": []
+        },
+        "toy": {
+            "count": 4,
+            "first_searched": "2025-04-03 10:54:31",
+            "last_searched": "2025-04-03 10:59:17",
+            "results_count": 0,
+            "trending_score": 4,
+            "metadata": []
+        },
+        "minecraftforum": {
+            "count": 3,
+            "first_searched": "2025-04-03 11:04:28",
+            "last_searched": "2025-04-03 11:08:50",
+            "results_count": 0,
+            "trending_score": 3,
+            "metadata": []
         }
     },
-    "last_updated": "2025-04-03 10:44:13"
+    "last_updated": "2025-04-03 11:08:50"
 }

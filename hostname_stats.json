@@ -43,9 +43,9 @@
             "metadata": []
         },
         "en.wikipedia.org": {
-            "appearances": 1824,
+            "appearances": 1848,
             "first_appeared": "2025-03-27 06:56:22",
-            "last_appeared": "2025-04-03 10:44:13",
+            "last_appeared": "2025-04-03 11:08:50",
             "queries": [
                 "here",
                 "Jet",
@@ -142,9 +142,11 @@
                 "fall",
                 "world",
                 "hype",
-                "Cigs"
+                "Cigs",
+                "toy",
+                "minecraftforum"
             ],
-            "trending_score": 256.30351732314585,
+            "trending_score": 259.05365150856335,
             "metadata": []
         },
         "desktop-988msut": {
@@ -434,6 +436,6 @@
             "metadata": []
         }
     },
-    "total_appearances": 1944,
-    "last_updated": "2025-04-03 10:44:13"
+    "total_appearances": 1968,
+    "last_updated": "2025-04-03 11:08:50"
 }
